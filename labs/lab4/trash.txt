@@ -1,0 +1,89 @@
+!pip install qiskit[visualization]==1.1.0
+# Use the following if you are on MacOS/zsh
+#!pip install 'qiskit[visualization]'==1.1.0
+!pip install qiskit_ibm_runtime
+!pip install matplotlib
+!pip install pylatexenc
+!pip install networkx
+!pip install git+https://github.com/qiskit-community/Quantum-Challenge-Grader.git
+from qiskit.circuit import QuantumCircuit, Parameter
+from qiskit.circuit.library import PauliEvolutionGate
+from qiskit.quantum_info import SparsePauliOp
+from qiskit_ibm_runtime import QiskitRuntimeService
+from qiskit.transpiler import CouplingMap
+from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
+from qiskit.synthesis import LieTrotter
+
+from qiskit_ibm_runtime.options import EstimatorOptions, DynamicalDecouplingOptions
+from qiskit_ibm_runtime import EstimatorV2, Batch
+
+import numpy as np
+import matplotlib.pyplot as plt
+import json
+
+# Define system parameters
+
+num_spins = 12
+anisotropy = 1.
+h = 1.
+dt = Parameter('δt')
+
+lattice_map = CouplingMap.from_ring(num_spins, bidirectional=False)
+lattice_map.draw()
+
+edgelist = lattice_map.graph.edge_list()
+hamlist = []
+
+for edge in edgelist:
+    hamlist.append(("XX", edge, 1.))
+    hamlist.append(("YY", edge, 1.))
+    hamlist.append(("ZZ", edge, anisotropy))
+
+for qubit in lattice_map.physical_qubits:
+    hamlist.append(("X", [qubit], h))
+
+hamiltonian = SparsePauliOp.from_sparse_list(hamlist, num_qubits=num_spins)
+
+# Exercise 1: Create a function that will correctly generate the Hamiltonian for a Heisenberg chain given either 
+
+
+def build_hamiltonian(num_spins, anisotropy, h):
+    # Create a coupling map with closed boundary conditions
+    lattice_map = CouplingMap.from_line(num_spins, bidirectional=False)
+    
+    # Get the edge list and initialize the Hamiltonian list
+    edgelist = lattice_map.graph.edge_list()
+    hamlist = []
+
+    # Iterate over each edge to build the Hamiltonian terms
+    for edge in edgelist:
+        hamlist.append(("XX", edge, 1.))
+        hamlist.append(("YY", edge, 1.))
+        hamlist.append(("ZZ", edge, anisotropy))
+
+    # Add the external field terms
+    for qubit in lattice_map.physical_qubits:
+        hamlist.append(("X", [qubit], h))
+
+    # Create the Hamiltonian as a SparsePauliOp object
+    hamiltonian = SparsePauliOp.from_sparse_list(hamlist, num_qubits=num_spins)
+    
+    return hamiltonian
+
+# Prepare a time evolution circuit
+hamiltonian = build_hamiltonian(num_spins, anisotropy, h)
+time_evolution_operator = PauliEvolutionGate(hamiltonian, time=dt)
+trotter_factory = LieTrotter(reps=4)
+evolution_circuit = trotter_factory.synthesize(time_evolution_operator)
+evolution_circuit.decompose().draw('mpl')
+
+z_observables = [ SparsePauliOp.from_sparse_list([('Z', [i], 1.)], num_qubits=num_spins) for i in range(num_spins) ]
+print(z_observables)
+
+In this next exercise, create a new function called build_layered_hamiltonian which will create a SparsePauliOp objects which is a sum of operators acting on even pairs of qubits and odd pairs of qubits. do so
+
+(Hint: follow the same steps as before, but include a check to see if you are inspecting an even or odd qubit pair when iterating over the graph.)
+
+# Exercise 2: Create a function that will generate a reordered Hamiltonian which is more efficient for qpu execution.
+
+def build_layered_hamiltonian(num_spins, anisotropy, h):
